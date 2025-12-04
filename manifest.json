@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
-    "name": "UVG Class Sniper",
+    "name": "Class Sniper",
     "version": "1.0.0",
-    "description": "Automatiza la asignación de cursos en el sistema de UVG",
+    "description": "Automatiza la asignación de cursos en el sistema académico",
     "permissions": ["storage", "activeTab", "notifications"],
     "host_permissions": ["https://*.uvg.edu.gt/*"],
     "action": {

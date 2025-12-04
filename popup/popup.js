@@ -5,8 +5,17 @@ let state = {
     logs: [],
 };
 
+const icons = {
+    trash: `
+        <svg class="icon" viewBox="0 0 24 24" role="presentation">
+            <path d="M6 7h12m-9 3v6m6-6v6M9 7V5.6a1.6 1.6 0 0 1 1.6-1.6h2.8A1.6 1.6 0 0 1 15 5.6V7m3 0v11.2A1.8 1.8 0 0 1 16.2 20H7.8A1.8 1.8 0 0 1 6 18.2V7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+        </svg>
+    `,
+};
+
 const elements = {
     toggleBtn: document.getElementById("toggleBtn"),
+    toggleBtnLabel: document.querySelector("#toggleBtn .btn-label"),
     statusIndicator: document.getElementById("statusIndicator"),
     statusText: document.getElementById("statusText"),
     coursesList: document.getElementById("coursesList"),
@@ -67,7 +76,12 @@ function updateUI() {
     elements.statusIndicator.classList.toggle("active", state.isActive);
     elements.statusText.textContent = state.isActive ? "Activo" : "Inactivo";
 
-    elements.toggleBtn.textContent = state.isActive ? "⏸️ Detener" : "▶️ Iniciar";
+    elements.toggleBtn.dataset.state = state.isActive ? "running" : "idle";
+    if (elements.toggleBtnLabel) {
+        elements.toggleBtnLabel.textContent = state.isActive ? "Detener" : "Iniciar";
+    } else {
+        elements.toggleBtn.textContent = state.isActive ? "Detener" : "Iniciar";
+    }
     elements.toggleBtn.classList.toggle("active", state.isActive);
 
     elements.refreshInterval.value = state.refreshInterval;
@@ -78,27 +92,34 @@ function updateUI() {
 
 function renderCourses() {
     if (state.courses.length === 0) {
-        elements.coursesList.innerHTML = '<div class="empty-state">No hay cursos configurados</div>';
+        elements.coursesList.innerHTML = `
+            <div class="empty-state">
+                No hay cursos configurados todavía. Usa el botón para agregar uno nuevo.
+            </div>
+        `;
         return;
     }
 
     elements.coursesList.innerHTML = state.courses
         .map(
             (course, index) => `
-    <div class="course-item">
-      <div class="course-info">
-        <div class="course-code">${course.code}</div>
-        <div class="course-sections">Secciones: ${course.sections.join(", ")}</div>
-      </div>
-      <button class="delete-btn" data-index="${index}">🗑️</button>
-    </div>
-  `
+                <article class="course-item">
+                    <div class="course-chip">${course.code}</div>
+                    <div class="course-info">
+                        <p class="course-label">Secciones</p>
+                        <p class="course-sections">${course.sections.join(", ")}</p>
+                    </div>
+                    <button class="icon-button delete-btn" data-index="${index}" aria-label="Eliminar ${course.code}">
+                        ${icons.trash}
+                    </button>
+                </article>
+            `
         )
         .join("");
 
     document.querySelectorAll(".delete-btn").forEach((btn) => {
         btn.addEventListener("click", (e) => {
-            const index = parseInt(e.target.dataset.index);
+            const index = parseInt(e.currentTarget.dataset.index, 10);
             deleteCourse(index);
         });
     });
@@ -178,18 +199,22 @@ async function addLog(message) {
 
 function renderLogs() {
     if (state.logs.length === 0) {
-        elements.activityLog.innerHTML = '<div class="empty-state">Sin actividad reciente</div>';
+        elements.activityLog.innerHTML = `
+            <div class="empty-state">
+                Sin actividad reciente. Aquí aparecerán los eventos del bot.
+            </div>
+        `;
         return;
     }
 
     elements.activityLog.innerHTML = state.logs
         .map(
             (log) => `
-    <div class="log-entry">
-      <div class="log-time">${log.time}</div>
-      <div>${log.message}</div>
-    </div>
-  `
+                <div class="log-entry">
+                    <div class="log-time">${log.time}</div>
+                    <div>${log.message}</div>
+                </div>
+            `
         )
         .join("");
 }
