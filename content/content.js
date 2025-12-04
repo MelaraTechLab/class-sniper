@@ -1,3 +1,5 @@
+const DEBUG_MODE = true;
+
 let botConfig = {
     isActive: false,
     courses: [],
@@ -15,13 +17,16 @@ async function init() {
         botConfig.isActive = data.isActive;
         botConfig.courses = data.courses || [];
         botConfig.refreshInterval = data.refreshInterval * 1000;
-        startBot();
     }
 
     chrome.runtime.onMessage.addListener(handleMessage);
 
     if (isHomePage()) {
-        clickAsignacionButton();
+        if (botConfig.isActive) {
+            clickAsignacionButton();
+        }
+    } else if (isRegistrationPage() && botConfig.isActive) {
+        startBot();
     }
 }
 
@@ -43,7 +48,7 @@ function clickAsignacionButton() {
     const buttons = document.querySelectorAll("button.btn-success.text-uppercase");
     for (const btn of buttons) {
         if (btn.textContent.includes("Asignación")) {
-            log("Clickeando botón de Asignación...");
+            log("Clickeando botón de Asignación..." + (DEBUG_MODE ? " (navegación permitida en DEBUG)" : ""));
             btn.click();
             return true;
         }
@@ -155,7 +160,7 @@ function findSection(tbody, sectionNumber) {
         const celdas = fila.querySelectorAll("td");
         if (celdas.length === 0) continue;
 
-        const seccionTexto = celdas[0]?.textContent.trim();
+        const seccionTexto = celdas[1]?.textContent.trim();
 
         let numeroSeccion = null;
         if (seccionTexto.includes("Sección:")) {
@@ -177,18 +182,12 @@ function findSection(tbody, sectionNumber) {
 function getAvailableSpaces(fila) {
     const celdas = fila.querySelectorAll("td");
 
-    for (let i = 0; i < celdas.length; i++) {
-        const texto = celdas[i].textContent.trim();
-        const match = texto.match(/(\d+)/);
-        if ((match && texto.toLowerCase().includes("disponible")) || i === 4) {
-            return parseInt(match[1]);
-        }
-    }
-
     const disponiblesTexto = celdas[4]?.textContent.trim();
     if (disponiblesTexto) {
-        const numero = parseInt(disponiblesTexto.replace(/\D/g, ""));
-        return isNaN(numero) ? 0 : numero;
+        const match = disponiblesTexto.match(/-?\d+/);
+        if (match) {
+            return parseInt(match[0]);
+        }
     }
 
     return 0;
@@ -207,6 +206,12 @@ async function assignToSection(fila, courseCode, sectionNumber) {
     if (botonAsignar.disabled || botonAsignar.hasAttribute("disabled")) {
         log(`⚠️ El botón está deshabilitado`);
         return false;
+    }
+
+    if (DEBUG_MODE) {
+        log(`🐛 DEBUG: Botón de asignar encontrado y habilitado (no se clickeó)`);
+        log(`🐛 DEBUG: En modo normal, aquí se haría click y se confirmaría la asignación`);
+        return true;
     }
 
     botonAsignar.click();
@@ -251,12 +256,13 @@ async function waitForModal() {
 
 function startBot() {
     if (botConfig.isActive && refreshTimer === null) {
-        log("🚀 Bot iniciado");
+        log("🚀 Bot iniciado" + (DEBUG_MODE ? " (MODO DEBUG - no clickeará botones de asignar)" : ""));
 
         processRegistration();
 
         refreshTimer = setInterval(() => {
             log("🔄 Refrescando página...");
+            hasProcessedRegistration = false;
             window.location.reload();
         }, botConfig.refreshInterval);
     }
@@ -278,7 +284,14 @@ function handleMessage(message, sender, sendResponse) {
             courses: message.config.courses,
             refreshInterval: message.config.refreshInterval,
         };
-        startBot();
+
+        if (isHomePage()) {
+            clickAsignacionButton();
+        } else if (isRegistrationPage()) {
+            startBot();
+        } else {
+            log("⚠️ No estamos en una página válida (ni inicio ni registro)");
+        }
     } else if (message.action === "stop") {
         stopBot();
     }
@@ -306,5 +319,22 @@ function showSuccessNotification(course) {
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+let hasProcessedRegistration = false;
+
+const observer = new MutationObserver(() => {
+    if (isRegistrationPage() && botConfig.isActive && !hasProcessedRegistration && !isProcessing) {
+        log("🔍 Detectada página de registro mediante observer");
+        hasProcessedRegistration = true;
+        setTimeout(() => {
+            startBot();
+        }, 1000);
+    }
+});
+
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
 
 init();
