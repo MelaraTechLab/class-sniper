@@ -1,4 +1,4 @@
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
 
 let botConfig = {
     isActive: false,
@@ -48,7 +48,7 @@ function clickAsignacionButton() {
     const buttons = document.querySelectorAll("button.btn-success.text-uppercase");
     for (const btn of buttons) {
         if (btn.textContent.includes("Asignación")) {
-            log("Clickeando botón de Asignación..." + (DEBUG_MODE ? " (navegación permitida en DEBUG)" : ""));
+            log("Navegando a página de asignación...");
             btn.click();
             return true;
         }
@@ -256,7 +256,7 @@ async function waitForModal() {
 
 function startBot() {
     if (botConfig.isActive && refreshTimer === null) {
-        log("🚀 Bot iniciado" + (DEBUG_MODE ? " (MODO DEBUG - no clickeará botones de asignar)" : ""));
+        log("🚀 Bot iniciado - Buscando espacios disponibles...");
 
         processRegistration();
 
@@ -306,14 +306,45 @@ function log(message) {
     });
 }
 
+function playSuccessSound() {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    const beeps = [
+        { freq: 800, start: 0, duration: 0.15 },
+        { freq: 1000, start: 0.2, duration: 0.15 },
+        { freq: 1200, start: 0.4, duration: 0.3 }
+    ];
+
+    beeps.forEach(beep => {
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = beep.freq;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + beep.start);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + beep.start + beep.duration);
+
+        oscillator.start(audioContext.currentTime + beep.start);
+        oscillator.stop(audioContext.currentTime + beep.start + beep.duration);
+    });
+}
+
 function showSuccessNotification(course) {
+    playSuccessSound();
+
     chrome.runtime.sendMessage({
         action: "notify",
-        title: "¡Asignación exitosa! 🎉",
-        message: `Te has asignado a ${course.code}`,
+        title: "¡ASIGNACIÓN EXITOSA! 🎉",
+        message: `¡Te has asignado exitosamente a ${course.code}!`,
     });
 
-    alert(`✅ ¡Asignación exitosa!\n\nTe has asignado al curso ${course.code}`);
+    setTimeout(() => {
+        alert(`✅ ¡ASIGNACIÓN EXITOSA! 🎉\n\nTe has asignado al curso ${course.code}\n\nSección asignada: Revisar en el sistema`);
+    }, 100);
 }
 
 function sleep(ms) {
@@ -324,7 +355,6 @@ let hasProcessedRegistration = false;
 
 const observer = new MutationObserver(() => {
     if (isRegistrationPage() && botConfig.isActive && !hasProcessedRegistration && !isProcessing) {
-        log("🔍 Detectada página de registro mediante observer");
         hasProcessedRegistration = true;
         setTimeout(() => {
             startBot();
